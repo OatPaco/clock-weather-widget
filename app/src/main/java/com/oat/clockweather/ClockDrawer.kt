@@ -8,6 +8,7 @@ import kotlin.math.*
 data class WeatherData(
     val temperature: Int = 0,
     val humidity: Int = 0,
+    val precipitation: Float = 0f,
     val weatherCode: Int = 0,
     val locationName: String = "—"
 )
@@ -52,7 +53,7 @@ class ClockDrawer(private val context: Context) {
         val clockCx = width / 2f
         val clockCy = clockAreaTop + (clockAreaBottom - clockAreaTop) / 2f
 
-        drawDateRow(canvas, width.toFloat(), padding, topRowHeight, colors, calendar, weather?.locationName ?: "—")
+        drawDateRow(canvas, width.toFloat(), padding, topRowHeight, colors, calendar, weather)
         drawClock(canvas, clockCx, clockCy, clockSize / 2f, colors, calendar)
         drawWeatherRow(canvas, width.toFloat(), height.toFloat(), bottomRowHeight, padding, colors, weather)
 
@@ -73,9 +74,10 @@ class ClockDrawer(private val context: Context) {
         canvas.drawRoundRect(rect, w * 0.13f, h * 0.13f, paint)
     }
 
+    // Date row — date left, humidity right
     private fun drawDateRow(
         canvas: Canvas, w: Float, padding: Float, rowH: Float,
-        colors: ThemeColors, cal: Calendar, locationName: String
+        colors: ThemeColors, cal: Calendar, weather: WeatherData?
     ) {
         val dayNames = arrayOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
         val monthNames = arrayOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
@@ -91,170 +93,161 @@ class ClockDrawer(private val context: Context) {
         }
         canvas.drawText(dateStr, padding + 2, rowH * 0.82f + 2, datePaint)
 
-        val locPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = colors.textTertiary
-            textSize = rowH * 0.48f
-            textAlign = Paint.Align.RIGHT
-            typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+        // Humidity on top right
+        if (weather != null) {
+            val humStr = "\uD83D\uDCA7${weather.humidity}%"
+            val humPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = colors.textSecondary
+                textSize = rowH * 0.62f
+                textAlign = Paint.Align.RIGHT
+            }
+            canvas.drawText(humStr, w - padding - 2, rowH * 0.82f + 2, humPaint)
         }
-        canvas.drawText(locationName, w - padding - 2, rowH * 0.78f + 2, locPaint)
     }
 
+    // Clock — rounded rectangle (chamfered)
     private fun drawClock(
-        canvas: Canvas, cx: Float, cy: Float, radius: Float,
+        canvas: Canvas, cx: Float, cy: Float, halfSize: Float,
         colors: ThemeColors, cal: Calendar
     ) {
-        val bezelR = radius
-        val faceR = radius * 0.93f
+        val bezelHalf = halfSize
+        val faceHalf = halfSize * 0.93f
+        val cornerR = halfSize * 0.22f       // chamfer radius
+        val faceCornerR = cornerR * 0.88f
 
         // === Drop shadow ===
         val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.TRANSPARENT
-            setShadowLayer(radius * 0.08f, radius * 0.02f, radius * 0.04f,
+            setShadowLayer(halfSize * 0.08f, halfSize * 0.02f, halfSize * 0.04f,
                 Color.argb(if (colors.isLight) 50 else 130, 0, 0, 0))
         }
-        canvas.drawCircle(cx, cy, bezelR, shadowPaint)
+        val bezelRect = RectF(cx - bezelHalf, cy - bezelHalf, cx + bezelHalf, cy + bezelHalf)
+        canvas.drawRoundRect(bezelRect, cornerR, cornerR, shadowPaint)
 
         // === Metallic bezel ===
         val bezelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = LinearGradient(
-                cx - bezelR, cy - bezelR, cx + bezelR, cy + bezelR,
+                cx - bezelHalf, cy - bezelHalf, cx + bezelHalf, cy + bezelHalf,
                 colors.bezelColors, colors.bezelPositions, Shader.TileMode.CLAMP
             )
         }
-        canvas.drawCircle(cx, cy, bezelR, bezelPaint)
+        canvas.drawRoundRect(bezelRect, cornerR, cornerR, bezelPaint)
 
+        // Bezel edge highlight
         val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeWidth = 0.5f
             color = Color.argb(if (colors.isLight) 25 else 40, 255, 255, 255)
         }
-        canvas.drawCircle(cx, cy, bezelR, edgePaint)
+        canvas.drawRoundRect(bezelRect, cornerR, cornerR, edgePaint)
 
         // === Cat photo face ===
-        drawCatFace(canvas, cx, cy, faceR, colors)
+        val faceRect = RectF(cx - faceHalf, cy - faceHalf, cx + faceHalf, cy + faceHalf)
+        drawCatFace(canvas, faceRect, faceCornerR, colors)
 
-        // === Hour markers (subtle on photo) ===
-        drawMarkers(canvas, cx, cy, faceR, colors)
+        // === Markers ===
+        drawMarkers(canvas, cx, cy, faceHalf, colors)
 
         // === Hands ===
-        drawHands(canvas, cx, cy, faceR, colors, cal)
+        drawHands(canvas, cx, cy, faceHalf, colors, cal)
 
         // === Center cap ===
-        drawCenterCap(canvas, cx, cy, faceR, colors)
+        drawCenterCap(canvas, cx, cy, faceHalf, colors)
     }
 
-    private fun drawCatFace(canvas: Canvas, cx: Float, cy: Float, r: Float, colors: ThemeColors) {
+    private fun drawCatFace(canvas: Canvas, faceRect: RectF, cornerR: Float, colors: ThemeColors) {
+        val w = faceRect.width().toInt()
+        val h = faceRect.height().toInt()
+        val cx = faceRect.centerX()
+        val cy = faceRect.centerY()
+        val r = w / 2f
+
         val catSrc = getCatBitmap()
 
         if (catSrc != null) {
-            // Crop and scale cat photo to circle
-            val size = (r * 2).toInt()
-            val scaled = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            val scaled = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
             val c = Canvas(scaled)
 
-            // Center-crop the source image
+            // Center-crop source
             val srcW = catSrc.width.toFloat()
             val srcH = catSrc.height.toFloat()
             val cropSize = min(srcW, srcH)
-            val srcRect = RectF(
-                (srcW - cropSize) / 2f,
-                (srcH - cropSize) / 2f,
-                (srcW + cropSize) / 2f,
-                (srcH + cropSize) / 2f
+            val srcR = Rect(
+                ((srcW - cropSize) / 2f).toInt(), ((srcH - cropSize) / 2f).toInt(),
+                ((srcW + cropSize) / 2f).toInt(), ((srcH + cropSize) / 2f).toInt()
             )
-            val dstRect = RectF(0f, 0f, size.toFloat(), size.toFloat())
 
-            // Clip to circle
+            // Clip to rounded rect
             val clipPath = Path().apply {
-                addCircle(size / 2f, size / 2f, size / 2f, Path.Direction.CW)
+                addRoundRect(RectF(0f, 0f, w.toFloat(), h.toFloat()), cornerR, cornerR, Path.Direction.CW)
             }
             c.clipPath(clipPath)
 
-            // Draw the cat photo
-            val imgPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-            c.drawBitmap(catSrc, Rect(
-                srcRect.left.toInt(), srcRect.top.toInt(),
-                srcRect.right.toInt(), srcRect.bottom.toInt()
-            ), Rect(0, 0, size, size), imgPaint)
+            // Draw cat photo
+            c.drawBitmap(catSrc, srcR, Rect(0, 0, w, h),
+                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
 
-            // Vignette effect (darken edges for depth)
+            // Vignette
             val vignettePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 shader = RadialGradient(
-                    size / 2f, size / 2f, size / 2f,
-                    intArrayOf(
-                        Color.TRANSPARENT,
-                        Color.TRANSPARENT,
-                        Color.argb(80, 0, 0, 0),
-                        Color.argb(180, 0, 0, 0)
-                    ),
-                    floatArrayOf(0f, 0.6f, 0.85f, 1f),
-                    Shader.TileMode.CLAMP
+                    w / 2f, h / 2f, r,
+                    intArrayOf(Color.TRANSPARENT, Color.TRANSPARENT, Color.argb(80, 0, 0, 0), Color.argb(180, 0, 0, 0)),
+                    floatArrayOf(0f, 0.6f, 0.85f, 1f), Shader.TileMode.CLAMP
                 )
             }
-            c.drawCircle(size / 2f, size / 2f, size / 2f, vignettePaint)
+            c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), vignettePaint)
 
-            // Draw the cropped cat onto main canvas
-            canvas.drawBitmap(scaled, cx - r, cy - r, Paint(Paint.ANTI_ALIAS_FLAG))
+            canvas.drawBitmap(scaled, faceRect.left, faceRect.top, Paint(Paint.ANTI_ALIAS_FLAG))
             scaled.recycle()
         } else {
-            // Fallback: dark gradient face if no cat image found
+            // Fallback gradient face
             val facePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 shader = RadialGradient(
                     cx - r * 0.2f, cy - r * 0.25f, r * 1.3f,
                     colors.faceColors, colors.facePositions, Shader.TileMode.CLAMP
                 )
             }
-            canvas.drawCircle(cx, cy, r, facePaint)
+            canvas.drawRoundRect(faceRect, cornerR, cornerR, facePaint)
         }
 
-        // Face inner edge (bezel-to-face transition)
+        // Face inner edge
         val faceEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = 1f
+            style = Paint.Style.STROKE; strokeWidth = 1f
             color = Color.argb(if (colors.isLight) 20 else 50, 0, 0, 0)
         }
-        canvas.drawCircle(cx, cy, r, faceEdgePaint)
+        canvas.drawRoundRect(faceRect, cornerR, cornerR, faceEdgePaint)
 
-        // Inner shadow ring (3D depth)
+        // Inner shadow ring
         val innerShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = RadialGradient(
-                cx, cy, r,
+            shader = RadialGradient(cx, cy, r,
                 intArrayOf(Color.TRANSPARENT, Color.TRANSPARENT, Color.argb(60, 0, 0, 0)),
                 floatArrayOf(0f, 0.85f, 1f), Shader.TileMode.CLAMP
             )
         }
-        canvas.drawCircle(cx, cy, r, innerShadowPaint)
+        canvas.drawRoundRect(faceRect, cornerR, cornerR, innerShadowPaint)
 
-        // Glass dome specular highlight
+        // Specular highlight
         val specPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
                 cx - r * 0.22f, cy - r * 0.32f, r * 0.55f,
-                intArrayOf(
-                    Color.argb((255 * colors.specularAlpha * 0.7f).toInt(), 255, 255, 255),
-                    Color.TRANSPARENT
-                ),
+                intArrayOf(Color.argb((255 * colors.specularAlpha * 0.7f).toInt(), 255, 255, 255), Color.TRANSPARENT),
                 floatArrayOf(0f, 1f), Shader.TileMode.CLAMP
             )
         }
-        canvas.drawCircle(cx, cy, r, specPaint)
+        canvas.drawRoundRect(faceRect, cornerR, cornerR, specPaint)
 
-        // Bottom shadow for dome curvature
+        // Bottom shadow
         val bottomPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = LinearGradient(
-                cx, cy - r, cx, cy + r,
+            shader = LinearGradient(cx, cy - r, cx, cy + r,
                 intArrayOf(Color.TRANSPARENT, Color.TRANSPARENT, Color.argb(40, 0, 0, 0)),
                 floatArrayOf(0f, 0.65f, 1f), Shader.TileMode.CLAMP
             )
         }
-        canvas.drawCircle(cx, cy, r, bottomPaint)
+        canvas.drawRoundRect(faceRect, cornerR, cornerR, bottomPaint)
     }
 
     private fun drawMarkers(canvas: Canvas, cx: Float, cy: Float, r: Float, colors: ThemeColors) {
-        // Subtle dot markers only (don't obscure the cat photo)
-        val markerR = r * 0.87f
-
-        // 12 o'clock accent dot
+        val markerR = r * 0.85f
         val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colors.accentColor }
         val angle12 = Math.toRadians(-90.0)
         canvas.drawCircle(
@@ -262,11 +255,7 @@ class ClockDrawer(private val context: Context) {
             cy + (markerR * sin(angle12)).toFloat(),
             r * 0.04f, accentPaint
         )
-
-        // 3, 6, 9 o'clock subtle dots
-        val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(80, 255, 255, 255)
-        }
+        val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(80, 255, 255, 255) }
         for (i in intArrayOf(3, 6, 9)) {
             val angle = Math.toRadians((i * 30 - 90).toDouble())
             canvas.drawCircle(
@@ -283,65 +272,40 @@ class ClockDrawer(private val context: Context) {
     ) {
         val hours = cal.get(Calendar.HOUR)
         val minutes = cal.get(Calendar.MINUTE)
-
         val hourAngle = Math.toRadians(((hours + minutes / 60.0) * 30 - 90))
         val minuteAngle = Math.toRadians((minutes * 6 - 90).toDouble())
-
         val handCy = cy + r * 0.035f
 
-        // Hour hand shadow
+        // Hour hand
         drawHandLine(canvas, cx + 1, handCy + 2, hourAngle, r * 0.52f,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(65, 0, 0, 0); strokeWidth = r * 0.1f; strokeCap = Paint.Cap.ROUND
-            })
-        // Hour hand stroke
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(65, 0, 0, 0); strokeWidth = r * 0.1f; strokeCap = Paint.Cap.ROUND })
         drawHandLine(canvas, cx, handCy, hourAngle, r * 0.52f,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = colors.handStrokeColor; strokeWidth = r * 0.095f; strokeCap = Paint.Cap.ROUND
-            })
-        // Hour hand fill
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colors.handStrokeColor; strokeWidth = r * 0.095f; strokeCap = Paint.Cap.ROUND })
         drawHandLine(canvas, cx, handCy, hourAngle, r * 0.52f,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = colors.handLumeColor; strokeWidth = r * 0.07f; strokeCap = Paint.Cap.ROUND
-            })
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colors.handLumeColor; strokeWidth = r * 0.07f; strokeCap = Paint.Cap.ROUND })
 
-        // Minute hand shadow
+        // Minute hand
         drawHandLine(canvas, cx + 1, handCy + 2, minuteAngle, r * 0.72f,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(50, 0, 0, 0); strokeWidth = r * 0.065f; strokeCap = Paint.Cap.ROUND
-            })
-        // Minute hand stroke
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(50, 0, 0, 0); strokeWidth = r * 0.065f; strokeCap = Paint.Cap.ROUND })
         drawHandLine(canvas, cx, handCy, minuteAngle, r * 0.72f,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = colors.handStrokeColor; strokeWidth = r * 0.055f; strokeCap = Paint.Cap.ROUND
-            })
-        // Minute hand fill
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colors.handStrokeColor; strokeWidth = r * 0.055f; strokeCap = Paint.Cap.ROUND })
         drawHandLine(canvas, cx, handCy, minuteAngle, r * 0.72f,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = colors.handLumeColor; strokeWidth = r * 0.038f; strokeCap = Paint.Cap.ROUND
-            })
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colors.handLumeColor; strokeWidth = r * 0.038f; strokeCap = Paint.Cap.ROUND })
     }
 
     private fun drawHandLine(canvas: Canvas, cx: Float, cy: Float, angle: Double, length: Float, paint: Paint) {
-        canvas.drawLine(cx, cy,
-            cx + (length * cos(angle)).toFloat(),
-            cy + (length * sin(angle)).toFloat(), paint)
+        canvas.drawLine(cx, cy, cx + (length * cos(angle)).toFloat(), cy + (length * sin(angle)).toFloat(), paint)
     }
 
     private fun drawCenterCap(canvas: Canvas, cx: Float, cy: Float, r: Float, colors: ThemeColors) {
         val handCy = cy + r * 0.035f
         canvas.drawCircle(cx, handCy, r * 0.09f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (colors.isLight) 0xFFD0D0D0.toInt() else 0xFFB0B0B0.toInt()
-        })
+            color = if (colors.isLight) 0xFFD0D0D0.toInt() else 0xFFB0B0B0.toInt() })
         canvas.drawCircle(cx, handCy, r * 0.065f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (colors.isLight) 0xFFE8E8E8.toInt() else 0xFFD8D8D8.toInt()
-        })
-        canvas.drawCircle(cx, handCy, r * 0.035f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFF888888.toInt()
-        })
+            color = if (colors.isLight) 0xFFE8E8E8.toInt() else 0xFFD8D8D8.toInt() })
+        canvas.drawCircle(cx, handCy, r * 0.035f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF888888.toInt() })
         canvas.drawCircle(cx - r * 0.02f, handCy - r * 0.02f, r * 0.02f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb((255 * colors.specularAlpha * 0.6f).toInt(), 255, 255, 255)
-        })
+            color = Color.argb((255 * colors.specularAlpha * 0.6f).toInt(), 255, 255, 255) })
     }
 
     private fun drawWeatherRow(
@@ -352,35 +316,31 @@ class ClockDrawer(private val context: Context) {
         val iconStr = getWeatherEmoji(weather?.weatherCode ?: -1)
         val tempStr = if (weather != null) "${weather.temperature}°C" else "—"
 
-        val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = rowH * 0.75f }
         val tempPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = if (colors.isLight) colors.textPrimary
                     else if (ThemeManager.getColors(Theme.AMOLED) == colors) colors.accentColor
                     else Color.WHITE
-            textSize = rowH * 0.72f
+            textSize = rowH * 0.78f
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         }
-        val humPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = colors.textTertiary; textSize = rowH * 0.55f
-        }
-        val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = colors.textTertiary; alpha = (Color.alpha(colors.textTertiary) * 0.5f).toInt()
-            textSize = rowH * 0.55f
+        val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = rowH * 0.8f }
+        val precipPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = colors.textSecondary; textSize = rowH * 0.6f
         }
 
-        val humStr = "💧 ${weather?.humidity ?: 0}%"
+        val precipStr = if (weather != null) "\u2614${String.format("%.1f", weather.precipitation)}mm" else ""
         val iconW = iconPaint.measureText(iconStr)
         val tempW = tempPaint.measureText(tempStr)
-        val dotW = dotPaint.measureText("· ")
-        val humW = humPaint.measureText(humStr)
-        val gap = w * 0.03f
-        val totalW = iconW + gap + tempW + gap + dotW + humW
+        val precipW = if (weather != null) precipPaint.measureText(precipStr) else 0f
+        val gap = w * 0.025f
+        val totalW = iconW + gap + tempW + (if (weather != null) gap * 1.5f + precipW else 0f)
         var x = (w - totalW) / 2f
 
         canvas.drawText(iconStr, x, y, iconPaint); x += iconW + gap
-        canvas.drawText(tempStr, x, y, tempPaint); x += tempW + gap
-        canvas.drawText("· ", x, y, dotPaint); x += dotW
-        canvas.drawText(humStr, x, y, humPaint)
+        canvas.drawText(tempStr, x, y, tempPaint); x += tempW + gap * 1.5f
+        if (weather != null) {
+            canvas.drawText(precipStr, x, y, precipPaint)
+        }
     }
 
     private fun getWeatherEmoji(code: Int): String = when (code) {

@@ -10,6 +10,7 @@ object WeatherStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().apply {
             putInt("temperature", data.temperature)
             putInt("humidity", data.humidity)
+            putFloat("precipitation", data.precipitation)
             putInt("weather_code", data.weatherCode)
             putString("location_name", data.locationName)
             putLong("updated_at", System.currentTimeMillis())
@@ -25,6 +26,7 @@ object WeatherStore {
         return WeatherData(
             temperature = prefs.getInt("temperature", 0),
             humidity = prefs.getInt("humidity", 0),
+            precipitation = prefs.getFloat("precipitation", 0f),
             weatherCode = prefs.getInt("weather_code", 0),
             locationName = prefs.getString("location_name", "—") ?: "—"
         )

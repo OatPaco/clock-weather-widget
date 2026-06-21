@@ -13,7 +13,7 @@ object WeatherService {
             val url = URL(
                 "https://api.open-meteo.com/v1/forecast" +
                 "?latitude=$lat&longitude=$lon" +
-                "&current=temperature_2m,relative_humidity_2m,weather_code" +
+                "&current=temperature_2m,relative_humidity_2m,weather_code,precipitation" +
                 "&timezone=auto"
             )
             val conn = url.openConnection() as HttpURLConnection
@@ -44,6 +44,7 @@ object WeatherService {
             WeatherData(
                 temperature = current.getDouble("temperature_2m").toInt(),
                 humidity = current.getInt("relative_humidity_2m"),
+                precipitation = current.optDouble("precipitation", 0.0).toFloat(),
                 weatherCode = current.getInt("weather_code"),
                 locationName = "" // Will be filled by reverse geocoder
             )

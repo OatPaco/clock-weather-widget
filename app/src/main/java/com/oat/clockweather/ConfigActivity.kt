@@ -64,7 +64,7 @@ class ConfigActivity : Activity() {
             val preview = ImageView(this).apply {
                 layoutParams = LinearLayout.LayoutParams(previewSize, previewSize)
                 scaleType = ImageView.ScaleType.FIT_CENTER
-                val sampleWeather = WeatherData(32, 65, 0, "Bangkok")
+                val sampleWeather = WeatherData(32, 65, 0f, 0, "Bangkok")
                 setImageBitmap(clockDrawer.drawFull(
                     previewSize * 2, previewSize * 2,
                     theme, sampleWeather, Calendar.getInstance()
