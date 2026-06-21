@@ -89,7 +89,7 @@ class ClockDrawer(private val context: Context) {
         val monthName = monthNames[cal.get(Calendar.MONTH)]
         val dateStr = "$dayName, $dayNum $monthName"
 
-        val fontSize = clockTop * 0.42f
+        val fontSize = clockTop * 0.50f
         val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = colors.textPrimary
             textSize = fontSize
@@ -161,7 +161,7 @@ class ClockDrawer(private val context: Context) {
         colors: ThemeColors, humidity: Int
     ) {
         val humStr = "\uD83D\uDCA7$humidity%"
-        val fontSize = faceRect.height() * 0.085f
+        val fontSize = faceRect.height() * 0.102f
         val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textSize = fontSize
@@ -216,12 +216,12 @@ class ClockDrawer(private val context: Context) {
             c.drawBitmap(catSrc, srcR, Rect(0, 0, w, h),
                 Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
 
-            // Vignette (lighter, less coverage)
+            // Vignette (very subtle, just darken extreme edges)
             val vignettePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 shader = RadialGradient(
                     w / 2f, h / 2f, r,
-                    intArrayOf(Color.TRANSPARENT, Color.TRANSPARENT, Color.argb(40, 0, 0, 0), Color.argb(100, 0, 0, 0)),
-                    floatArrayOf(0f, 0.7f, 0.9f, 1f), Shader.TileMode.CLAMP
+                    intArrayOf(Color.TRANSPARENT, Color.TRANSPARENT, Color.argb(15, 0, 0, 0), Color.argb(35, 0, 0, 0)),
+                    floatArrayOf(0f, 0.8f, 0.95f, 1f), Shader.TileMode.CLAMP
                 )
             }
             c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), vignettePaint)
@@ -242,37 +242,9 @@ class ClockDrawer(private val context: Context) {
         // Face inner edge
         val faceEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE; strokeWidth = 1f
-            color = Color.argb(if (colors.isLight) 20 else 50, 0, 0, 0)
+            color = Color.argb(if (colors.isLight) 20 else 30, 0, 0, 0)
         }
         canvas.drawRoundRect(faceRect, cornerR, cornerR, faceEdgePaint)
-
-        // Inner shadow ring
-        val innerShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = RadialGradient(cx, cy, r,
-                intArrayOf(Color.TRANSPARENT, Color.TRANSPARENT, Color.argb(60, 0, 0, 0)),
-                floatArrayOf(0f, 0.85f, 1f), Shader.TileMode.CLAMP
-            )
-        }
-        canvas.drawRoundRect(faceRect, cornerR, cornerR, innerShadowPaint)
-
-        // Specular highlight
-        val specPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = RadialGradient(
-                cx - r * 0.22f, cy - r * 0.32f, r * 0.55f,
-                intArrayOf(Color.argb((255 * colors.specularAlpha * 0.7f).toInt(), 255, 255, 255), Color.TRANSPARENT),
-                floatArrayOf(0f, 1f), Shader.TileMode.CLAMP
-            )
-        }
-        canvas.drawRoundRect(faceRect, cornerR, cornerR, specPaint)
-
-        // Bottom shadow
-        val bottomPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = LinearGradient(cx, cy - r, cx, cy + r,
-                intArrayOf(Color.TRANSPARENT, Color.TRANSPARENT, Color.argb(40, 0, 0, 0)),
-                floatArrayOf(0f, 0.65f, 1f), Shader.TileMode.CLAMP
-            )
-        }
-        canvas.drawRoundRect(faceRect, cornerR, cornerR, bottomPaint)
     }
 
     private fun drawMarkers(canvas: Canvas, cx: Float, cy: Float, r: Float, colors: ThemeColors) {
@@ -307,19 +279,19 @@ class ClockDrawer(private val context: Context) {
 
         // Hour hand
         drawHandLine(canvas, cx + 1, handCy + 2, hourAngle, r * 0.52f,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(65, 0, 0, 0); strokeWidth = r * 0.1f; strokeCap = Paint.Cap.ROUND })
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(65, 0, 0, 0); strokeWidth = r * 0.13f; strokeCap = Paint.Cap.ROUND })
         drawHandLine(canvas, cx, handCy, hourAngle, r * 0.52f,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colors.handStrokeColor; strokeWidth = r * 0.095f; strokeCap = Paint.Cap.ROUND })
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colors.handStrokeColor; strokeWidth = r * 0.12f; strokeCap = Paint.Cap.ROUND })
         drawHandLine(canvas, cx, handCy, hourAngle, r * 0.52f,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colors.handLumeColor; strokeWidth = r * 0.07f; strokeCap = Paint.Cap.ROUND })
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colors.handLumeColor; strokeWidth = r * 0.09f; strokeCap = Paint.Cap.ROUND })
 
-        // Minute hand
-        drawHandLine(canvas, cx + 1, handCy + 2, minuteAngle, r * 0.72f,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(50, 0, 0, 0); strokeWidth = r * 0.065f; strokeCap = Paint.Cap.ROUND })
-        drawHandLine(canvas, cx, handCy, minuteAngle, r * 0.72f,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colors.handStrokeColor; strokeWidth = r * 0.055f; strokeCap = Paint.Cap.ROUND })
-        drawHandLine(canvas, cx, handCy, minuteAngle, r * 0.72f,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colors.handLumeColor; strokeWidth = r * 0.038f; strokeCap = Paint.Cap.ROUND })
+        // Minute hand (bigger)
+        drawHandLine(canvas, cx + 1, handCy + 2, minuteAngle, r * 0.75f,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(50, 0, 0, 0); strokeWidth = r * 0.09f; strokeCap = Paint.Cap.ROUND })
+        drawHandLine(canvas, cx, handCy, minuteAngle, r * 0.75f,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colors.handStrokeColor; strokeWidth = r * 0.08f; strokeCap = Paint.Cap.ROUND })
+        drawHandLine(canvas, cx, handCy, minuteAngle, r * 0.75f,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colors.handLumeColor; strokeWidth = r * 0.055f; strokeCap = Paint.Cap.ROUND })
     }
 
     private fun drawHandLine(canvas: Canvas, cx: Float, cy: Float, angle: Double, length: Float, paint: Paint) {
