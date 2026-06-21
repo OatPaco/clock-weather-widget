@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ocean_bg_start">#FF1A1A2E</color>
+    <color name="ocean_bg_end">#FF0F3460</color>
+    <color name="ocean_accent">#FFFF6B4A</color>
+    <color name="sunset_bg_start">#FF2D1B4E</color>
+    <color name="sunset_bg_end">#FF6B2737</color>
+    <color name="sunset_accent">#FFFF8855</color>
+    <color name="frosted_bg">#30A0B8C8</color>
+    <color name="frosted_accent">#FFE05030</color>
+    <color name="amoled_bg">#FF000000</color>
+    <color name="amoled_accent">#FF00FF88</color>
+    <color name="white_bg">#F5FFFFFF</color>
+    <color name="white_accent">#FFE05030</color>
+</resources>

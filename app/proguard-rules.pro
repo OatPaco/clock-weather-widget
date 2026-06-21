@@ -1,0 +1,4 @@
+-keep class com.oat.clockweather.** { *; }
+-keepclassmembers class * extends android.appwidget.AppWidgetProvider { *; }
+-keepclassmembers class * extends androidx.work.Worker { *; }
+-keepclassmembers class * extends androidx.work.CoroutineWorker { *; }
