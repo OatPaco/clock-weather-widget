@@ -283,11 +283,9 @@ class ClockDrawer(private val context: Context) {
     ) {
         val hours = cal.get(Calendar.HOUR)
         val minutes = cal.get(Calendar.MINUTE)
-        val seconds = cal.get(Calendar.SECOND)
 
         val hourAngle = Math.toRadians(((hours + minutes / 60.0) * 30 - 90))
-        val minuteAngle = Math.toRadians(((minutes + seconds / 60.0) * 6 - 90))
-        val secondAngle = Math.toRadians((seconds * 6 - 90).toDouble())
+        val minuteAngle = Math.toRadians((minutes * 6 - 90).toDouble())
 
         val handCy = cy + r * 0.035f
 
@@ -322,22 +320,6 @@ class ClockDrawer(private val context: Context) {
             Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = colors.handLumeColor; strokeWidth = r * 0.038f; strokeCap = Paint.Cap.ROUND
             })
-
-        // Second hand + tail
-        val secPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = colors.accentColor; strokeWidth = r * 0.015f; strokeCap = Paint.Cap.ROUND
-        }
-        val tailAngle = secondAngle + Math.PI
-        canvas.drawLine(cx, handCy,
-            cx + (r * 0.15f * cos(tailAngle)).toFloat(),
-            handCy + (r * 0.15f * sin(tailAngle)).toFloat(), secPaint)
-        drawHandLine(canvas, cx, handCy, secondAngle, r * 0.78f, secPaint)
-
-        // Counterweight circle
-        canvas.drawCircle(
-            cx + (r * 0.12f * cos(tailAngle)).toFloat(),
-            handCy + (r * 0.12f * sin(tailAngle)).toFloat(),
-            r * 0.06f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colors.accentColor })
     }
 
     private fun drawHandLine(canvas: Canvas, cx: Float, cy: Float, angle: Double, length: Float, paint: Paint) {
