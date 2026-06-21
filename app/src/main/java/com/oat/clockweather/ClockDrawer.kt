@@ -52,9 +52,12 @@ class ClockDrawer(private val context: Context) {
         val clockSize = min(clockAreaBottom - clockAreaTop, width - padding * 2)
         val clockCx = width / 2f
         val clockCy = clockAreaTop + (clockAreaBottom - clockAreaTop) / 2f
+        val clockTop = clockCy - clockSize / 2f
 
-        drawDateRow(canvas, width.toFloat(), padding, topRowHeight, colors, calendar, weather)
-        drawClock(canvas, clockCx, clockCy, clockSize / 2f, colors, calendar)
+        // Date centered between widget top and clock top
+        drawDateRow(canvas, width.toFloat(), padding, clockTop, colors, calendar)
+        // Clock with humidity badge inside
+        drawClock(canvas, clockCx, clockCy, clockSize / 2f, colors, calendar, weather)
         drawWeatherRow(canvas, width.toFloat(), height.toFloat(), bottomRowHeight, padding, colors, weather)
 
         return bitmap
@@ -74,10 +77,10 @@ class ClockDrawer(private val context: Context) {
         canvas.drawRoundRect(rect, w * 0.13f, h * 0.13f, paint)
     }
 
-    // Date row — date left, humidity right
+    // Date row — centered between widget top and clock top
     private fun drawDateRow(
-        canvas: Canvas, w: Float, padding: Float, rowH: Float,
-        colors: ThemeColors, cal: Calendar, weather: WeatherData?
+        canvas: Canvas, w: Float, padding: Float, clockTop: Float,
+        colors: ThemeColors, cal: Calendar
     ) {
         val dayNames = arrayOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
         val monthNames = arrayOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
@@ -86,29 +89,22 @@ class ClockDrawer(private val context: Context) {
         val monthName = monthNames[cal.get(Calendar.MONTH)]
         val dateStr = "$dayName, $dayNum $monthName"
 
+        val fontSize = clockTop * 0.42f
         val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = colors.textPrimary
-            textSize = rowH * 0.72f
+            textSize = fontSize
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            textAlign = Paint.Align.CENTER
         }
-        canvas.drawText(dateStr, padding + 2, rowH * 0.82f + 2, datePaint)
-
-        // Humidity on top right
-        if (weather != null) {
-            val humStr = "\uD83D\uDCA7${weather.humidity}%"
-            val humPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = colors.textSecondary
-                textSize = rowH * 0.62f
-                textAlign = Paint.Align.RIGHT
-            }
-            canvas.drawText(humStr, w - padding - 2, rowH * 0.82f + 2, humPaint)
-        }
+        // Vertically center in the space between widget top (with padding) and clock top
+        val textY = padding + (clockTop - padding) / 2f + fontSize * 0.35f
+        canvas.drawText(dateStr, w / 2f, textY, datePaint)
     }
 
     // Clock — rounded rectangle (chamfered)
     private fun drawClock(
         canvas: Canvas, cx: Float, cy: Float, halfSize: Float,
-        colors: ThemeColors, cal: Calendar
+        colors: ThemeColors, cal: Calendar, weather: WeatherData?
     ) {
         val bezelHalf = halfSize
         val faceHalf = halfSize * 0.93f
@@ -145,6 +141,11 @@ class ClockDrawer(private val context: Context) {
         val faceRect = RectF(cx - faceHalf, cy - faceHalf, cx + faceHalf, cy + faceHalf)
         drawCatFace(canvas, faceRect, faceCornerR, colors)
 
+        // === Humidity badge (top-right inside clock face) ===
+        if (weather != null) {
+            drawHumidityBadge(canvas, faceRect, faceCornerR, colors, weather.humidity)
+        }
+
         // === Markers ===
         drawMarkers(canvas, cx, cy, faceHalf, colors)
 
@@ -153,6 +154,34 @@ class ClockDrawer(private val context: Context) {
 
         // === Center cap ===
         drawCenterCap(canvas, cx, cy, faceHalf, colors)
+    }
+
+    private fun drawHumidityBadge(
+        canvas: Canvas, faceRect: RectF, cornerR: Float,
+        colors: ThemeColors, humidity: Int
+    ) {
+        val humStr = "\uD83D\uDCA7$humidity%"
+        val fontSize = faceRect.height() * 0.085f
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = fontSize
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        }
+        val textW = textPaint.measureText(humStr)
+        val padH = fontSize * 0.5f
+        val padV = fontSize * 0.35f
+        val badgeX = faceRect.right - textW - padH * 2 - faceRect.width() * 0.06f
+        val badgeY = faceRect.top + faceRect.height() * 0.06f
+
+        // Semi-transparent background pill
+        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(153, 0, 0, 0) // 60% transparent black
+        }
+        val bgRect = RectF(badgeX, badgeY, badgeX + textW + padH * 2, badgeY + fontSize + padV * 2)
+        canvas.drawRoundRect(bgRect, fontSize * 0.5f, fontSize * 0.5f, bgPaint)
+
+        // Text
+        canvas.drawText(humStr, badgeX + padH, badgeY + padV + fontSize * 0.85f, textPaint)
     }
 
     private fun drawCatFace(canvas: Canvas, faceRect: RectF, cornerR: Float, colors: ThemeColors) {
@@ -187,12 +216,12 @@ class ClockDrawer(private val context: Context) {
             c.drawBitmap(catSrc, srcR, Rect(0, 0, w, h),
                 Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
 
-            // Vignette
+            // Vignette (lighter, less coverage)
             val vignettePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 shader = RadialGradient(
                     w / 2f, h / 2f, r,
-                    intArrayOf(Color.TRANSPARENT, Color.TRANSPARENT, Color.argb(80, 0, 0, 0), Color.argb(180, 0, 0, 0)),
-                    floatArrayOf(0f, 0.6f, 0.85f, 1f), Shader.TileMode.CLAMP
+                    intArrayOf(Color.TRANSPARENT, Color.TRANSPARENT, Color.argb(40, 0, 0, 0), Color.argb(100, 0, 0, 0)),
+                    floatArrayOf(0f, 0.7f, 0.9f, 1f), Shader.TileMode.CLAMP
                 )
             }
             c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), vignettePaint)
@@ -325,7 +354,8 @@ class ClockDrawer(private val context: Context) {
         }
         val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = rowH * 0.8f }
         val precipPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = colors.textSecondary; textSize = rowH * 0.6f
+            color = if (colors.isLight) colors.textSecondary else colors.textPrimary
+            textSize = rowH * 0.6f
         }
 
         val precipStr = if (weather != null) "\u2614${String.format("%.1f", weather.precipitation)}mm" else ""
